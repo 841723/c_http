@@ -76,7 +76,16 @@ int send_response(int client_fd, char buff[MAX_LENGTH_REQUEST], int buff_len) {
  /**
   * Creates a tcp listener on port and executes callback 
   */
- int tcp_start_listener(char *port, void (*on_listen)(void), int (*on_request)(char buff[MAX_LENGTH_REQUEST], int, char buff2[MAX_LENGTH_RESPONSE], int*)) {
+ int tcp_start_listener(
+    char *port, 
+    void (*on_listen)(void), 
+    int (*on_request)(
+        char buff[MAX_LENGTH_REQUEST], 
+        int, 
+        char buff2[MAX_LENGTH_RESPONSE], 
+        int*
+    )
+) {
     int status, client_fd, bytes_sent, bytes_to_send, res_len, yes = 1;
     char *response, req[MAX_LENGTH_REQUEST], res[MAX_LENGTH_RESPONSE];
     
