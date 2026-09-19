@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <signal.h>
 
-#include "tcp.h"
 #include "http.h"
 
 
@@ -11,20 +10,19 @@
 void handler_sigint(int sig) {
     printf("\n");
     
-    tcp_stop_listener();
+    http_stop_listener();
 
     exit(0);
 }
 
-void callback(void) {
+void on_listen(void) {
     printf("Server started listening on port %s...\n", MYPORT);
 }
 
 int main() {
     signal(SIGINT, handler_sigint);
 
-    
-    tcp_start_listener("8888", callback, http_handle_request);
+    http_listen("8888", on_listen);
 
     printf("Server stopping successfully...\n");
 

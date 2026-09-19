@@ -7,9 +7,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "config.h"
-#include "lib.h"
-
 #include "tcp.h"
 
 #define BACKLOG 10     // how many pending connections queue holds
@@ -18,13 +15,7 @@
  Global Variables
 **********************************************/
 
-int sockfd = -1, http_server = 1;
-
-
-/**********************************************
-  Structs
-**********************************************/
-
+int sockfd = -1;
 
 
 /**********************************************
@@ -44,50 +35,22 @@ char *get_client_ip(struct sockaddr_in *client) {
     return client_ip;
 }
 
-int read_request(int client_fd, char buff[MAX_LENGTH_REQUEST]) {
-    int bytes_read = recv(client_fd, buff, MAX_LENGTH_REQUEST-1, 0);
-    if (bytes_read < 0) {
-        return bytes_read;
-    }
-    if (!bytes_read) {
-        return -0;
-    }
-
-    buff[bytes_read] = '\0';
-
-    printf("%s\n", buff);
-    return 0;
-}
-
-int send_response(int client_fd, char buff[MAX_LENGTH_REQUEST], int buff_len) {
-    int bytes_sent;
-
-    bytes_sent = send(client_fd, buff, buff_len, 0);
-    if (bytes_sent < 0) {
-        return -1;
-    }
-    return 0;
-}
-
 /**********************************************
    Exported functions
 ***********************************************/
 
  /**
-  * Creates a tcp listener on port and executes callback 
+  * Creates a tcp listener on port and delegates each connection to handler.
+  * handler is called in a forked child with client_fd and userdata.
+  * TCP layer does NOT know about HTTP or buffer sizes.
   */
- int tcp_start_listener(
-    char *port, 
-    void (*on_listen)(void), 
-    int (*on_request)(
-        char buff[MAX_LENGTH_REQUEST], 
-        int, 
-        char buff2[MAX_LENGTH_RESPONSE], 
-        int*
-    )
+int tcp_listen(
+    const char *port,
+    tcp_handler_t handler,
+    void *userdata,
+    void (*on_listen)(void)
 ) {
-    int status, client_fd, bytes_sent, bytes_to_send, res_len, yes = 1;
-    char *response, req[MAX_LENGTH_REQUEST], res[MAX_LENGTH_RESPONSE];
+    int status, client_fd, yes = 1;
     
     struct sockaddr_in client;
     socklen_t addr_size;
@@ -128,7 +91,9 @@ int send_response(int client_fd, char buff[MAX_LENGTH_REQUEST], int buff_len) {
         exit(-4);
     }
 
-    on_listen();
+    if (on_listen) {
+        on_listen();
+    }
 
     while (1) {
         addr_size = sizeof client;
@@ -151,22 +116,7 @@ int send_response(int client_fd, char buff[MAX_LENGTH_REQUEST], int buff_len) {
         if (!status) {
             // child
             close(sockfd);
-
-            if ((status = read_request(client_fd, req)) < 0) {
-                perror("read_request() Error\n");
-                exit(-7);
-            }
-            
-            if (on_request(req, (int)strlen(req), res, &res_len) < 0) {
-                perror("on_request() Error\n");
-                exit(-8);
-            }
-
-            if ((status = send_response(client_fd, res, res_len)) < 0) {
-                perror("read_request() Error\n");
-                exit(-9);
-            }
-            
+            handler(client_fd, userdata);
             close(client_fd);
             exit(0);
         } 
@@ -177,6 +127,7 @@ int send_response(int client_fd, char buff[MAX_LENGTH_REQUEST], int buff_len) {
     }
 
     close(sockfd);
+    return 0;
 }
 
 /**

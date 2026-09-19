@@ -1,21 +1,13 @@
 #ifndef TCP_H
 #define TCP_H
 
-#include "config.h"
+typedef void (*tcp_handler_t)(int client_fd, void *userdata);
 
-#include <netinet/in.h>
-
-int tcp_start_listener(
-    char *port, 
-    void (*on_listen)(
-        void
-    ), 
-    int (*on_request)(
-        char [MAX_LENGTH_REQUEST], 
-        int, 
-        char [MAX_LENGTH_RESPONSE], 
-        int*
-    )
+int tcp_listen(
+    const char *port,
+    tcp_handler_t handler,
+    void *userdata,
+    void (*on_listen)(void)
 );
 void tcp_stop_listener();
 

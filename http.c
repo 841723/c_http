@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 #include "config.h"
 #include "http_constants.h"
+#include "tcp.h"
 
 #include "http.h"
 
@@ -29,8 +32,8 @@ int parse_request(char raw_req[MAX_LENGTH_REQUEST], struct http_request *request
 }
 
 int route_request(struct http_request *request, struct http_response *response) {
-    // TODO
-    response->status_code = HTTP_STATUS_401_UNAUTHORIZED;
+    // TODO - se deja tal cual, sin integrar router
+    response->status_code = HTTP_STATUS_200_OK;
     snprintf(
         response->data,
         MAX_LENGTH_RESPONSE,
@@ -81,6 +84,32 @@ int build_response(
     return 0;
 }
 
+// Helpers de I/O ahora pertenecen a la capa HTTP, no a TCP
+static int http_read_request(int client_fd, char buff[MAX_LENGTH_REQUEST]) {
+    int bytes_read = recv(client_fd, buff, MAX_LENGTH_REQUEST-1, 0);
+    if (bytes_read < 0) {
+        return bytes_read;
+    }
+    if (!bytes_read) {
+        return 0;
+    }
+
+    buff[bytes_read] = '\0';
+
+    printf("%s\n", buff);
+    return 0;
+}
+
+static int http_send_response(int client_fd, char buff[MAX_LENGTH_RESPONSE], int buff_len) {
+    int bytes_sent;
+
+    bytes_sent = send(client_fd, buff, buff_len, 0);
+    if (bytes_sent < 0) {
+        return -1;
+    }
+    return 0;
+}
+
 
 /**********************************************
    Exported functions
@@ -112,4 +141,35 @@ int http_handle_request(
     }
     
     return 0;
+}
+
+void http_handler(int client_fd, void *userdata) {
+    (void)userdata; // reservado para futuro router/contexto sin romper firma
+    char req[MAX_LENGTH_REQUEST], res[MAX_LENGTH_RESPONSE];
+    int res_len;
+    int status;
+
+    if ((status = http_read_request(client_fd, req)) < 0) {
+        perror("http_read_request() Error\n");
+        return;
+    }
+
+    if (http_handle_request(req, (int)strlen(req), res, &res_len) < 0) {
+        perror("http_handle_request() Error\n");
+        return;
+    }
+
+    if ((status = http_send_response(client_fd, res, res_len)) < 0) {
+        perror("http_send_response() Error\n");
+        return;
+    }
+}
+
+int http_listen(const char *port, void (*on_listen)(void)) {
+    // HTTP usa TCP como transporte
+    return tcp_listen(port, http_handler, NULL, on_listen);
+}
+
+void http_stop_listener(void) {
+    tcp_stop_listener();
 }

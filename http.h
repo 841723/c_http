@@ -14,12 +14,12 @@ struct http_response {
     char *version;
 };
 
-int http_handle_request(
-    char raw_req[MAX_LENGTH_REQUEST], 
-    int raw_req_len, 
-    char raw_res[MAX_LENGTH_RESPONSE], 
-    int *raw_res_len
-);
+// Adapter para la capa TCP genérica: firma compatible con tcp_handler_t
+void http_handler(int client_fd, void *userdata);
+
+// API de alto nivel: main solo necesita http, no tcp
+int http_listen(const char *port, void (*on_listen)(void));
+void http_stop_listener(void);
 
 
 #endif
